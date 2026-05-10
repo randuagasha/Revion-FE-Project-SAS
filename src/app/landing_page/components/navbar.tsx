@@ -73,7 +73,7 @@ export default function Navbar() {
           {/* Actions */}
           <div className="hidden md:flex items-center gap-4">
             <Link
-              href="/login"
+              href="/auth/login"
               className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
             >
               Login
