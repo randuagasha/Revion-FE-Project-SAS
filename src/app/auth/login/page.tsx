@@ -11,6 +11,78 @@ import { Label } from "@/components/ui/label";
 import { loginUser } from "@/services/auth.service";
 import { Eye, EyeOff } from "lucide-react";
 
+type UserRole = "customer" | "mechanic" | "super_admin";
+
+interface LoginResponseUser {
+  id?: number;
+  name?: string;
+  email?: string;
+  role?: UserRole;
+}
+
+interface LoginResponse {
+  success?: boolean;
+  message?: string;
+  token?: string;
+  user?: LoginResponseUser;
+  data?: {
+    token?: string;
+    user?: LoginResponseUser;
+  };
+}
+
+interface JwtPayload {
+  id?: number;
+  user_id?: number;
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  exp?: number;
+  iat?: number;
+}
+
+const getTokenFromResponse = (response: LoginResponse) => {
+  return response.token || response.data?.token || "";
+};
+
+const getUserFromResponse = (response: LoginResponse) => {
+  return response.user || response.data?.user || null;
+};
+
+const decodeJwtPayload = (token: string): JwtPayload | null => {
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) return null;
+
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+
+    const decodedPayload = window.atob(normalizedPayload);
+
+    return JSON.parse(decodedPayload) as JwtPayload;
+  } catch (error) {
+    console.error("Failed to decode token:", error);
+
+    return null;
+  }
+};
+
+const getDashboardPathByRole = (role?: string) => {
+  if (role === "customer") {
+    return "/customers/dashboard";
+  }
+
+  if (role === "mechanic") {
+    return "/mechanics/dashboard";
+  }
+
+  if (role === "super_admin") {
+    return "/admins/dashboard";
+  }
+
+  return "/auth/login";
+};
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -22,21 +94,52 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!email.trim() || !password.trim()) {
+      setError("Email and password are required");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
 
-      const res = await loginUser({
+      const response = (await loginUser({
         email,
         password,
-      });
+      })) as LoginResponse;
 
-      localStorage.setItem("token", res.token);
+      const token = getTokenFromResponse(response);
 
-      router.push("/customers/dashboard");
+      if (!token) {
+        throw new Error("Token tidak ditemukan dari response login");
+      }
+
+      const responseUser = getUserFromResponse(response);
+      const decodedUser = decodeJwtPayload(token);
+
+      const user = {
+        id: responseUser?.id || decodedUser?.id || decodedUser?.user_id,
+        name: responseUser?.name || decodedUser?.name || "",
+        email: responseUser?.email || decodedUser?.email || email,
+        role: responseUser?.role || decodedUser?.role,
+      };
+
+      if (!user.role) {
+        throw new Error(
+          "Role user tidak ditemukan. Pastikan backend login mengirim user.role atau token berisi role.",
+        );
+      }
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("role", user.role);
+
+      router.replace(getDashboardPathByRole(user.role));
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Login failed:", err);
 
       setError("Invalid email or password");
     } finally {
@@ -85,7 +188,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
             {/* EMAIL */}
             <div className="space-y-2">
               <Label className="text-zinc-300">Email</Label>
@@ -95,6 +198,7 @@ export default function LoginPage() {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
                 className="h-11 bg-[#141414] border-zinc-800 text-white placeholder:text-zinc-600 focus-visible:ring-[#522C14]"
               />
             </div>
@@ -117,13 +221,15 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
                   className="h-11 bg-[#141414] border-zinc-800 text-white pr-10 focus-visible:ring-[#522C14]"
                 />
 
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-zinc-300"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={loading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-zinc-300 disabled:opacity-60"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -139,15 +245,16 @@ export default function LoginPage() {
 
             {/* LOGIN BUTTON */}
             <Button
-              onClick={handleLogin}
+              type="submit"
               disabled={loading}
-              className="w-full h-11 bg-[#522C14] hover:bg-[#6B3818] text-white font-medium transition"
+              className="w-full h-11 bg-[#522C14] hover:bg-[#6B3818] text-white font-medium transition disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Login"}
             </Button>
 
             {/* GOOGLE */}
             <Button
+              type="button"
               variant="outline"
               className="w-full h-11 border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white"
             >
@@ -164,7 +271,7 @@ export default function LoginPage() {
                 Register
               </Link>
             </p>
-          </div>
+          </form>
         </div>
       </div>
     </div>
