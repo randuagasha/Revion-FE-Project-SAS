@@ -84,7 +84,7 @@ const vehicleBrands: VehicleBrand[] = [
   },
   {
     name: "Honda",
-    logo: "/brands/honda.png",
+    logo: "/brands/hondaa.png",
   },
   {
     name: "Koenigsegg",

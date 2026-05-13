@@ -77,7 +77,7 @@ const getDashboardPathByRole = (role?: string) => {
   }
 
   if (role === "super_admin") {
-    return "/admins/dashboard";
+    return "/super_admin/dashboard";
   }
 
   return "/auth/login";
@@ -133,9 +133,13 @@ export default function LoginPage() {
         );
       }
 
+      localStorage.clear();
+
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("role", user.role);
+
+      window.dispatchEvent(new Event("user-updated"));
 
       router.replace(getDashboardPathByRole(user.role));
     } catch (err: unknown) {

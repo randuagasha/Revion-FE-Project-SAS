@@ -10,7 +10,7 @@ interface LoggedInUser {
   role?: "customer" | "mechanic" | "super_admin";
 }
 
-interface MechanicTopbarProps {
+interface SuperAdminTopbarProps {
   collapsed: boolean;
 }
 
@@ -52,16 +52,16 @@ const getRoleLabel = (role?: string) => {
   if (role === "mechanic") return "Mechanic";
   if (role === "super_admin") return "Super Admin";
 
-  return "User";
+  return "Super Admin";
 };
 
 const getInitial = (name?: string, email?: string) => {
-  const value = name || email || "M";
+  const value = name || email || "S";
 
   return value.charAt(0).toUpperCase();
 };
 
-export default function MechanicTopbar({ collapsed }: MechanicTopbarProps) {
+export default function SuperAdminTopbar({ collapsed }: SuperAdminTopbarProps) {
   const rawUser = useSyncExternalStore(
     subscribe,
     getSnapshot,
@@ -81,10 +81,16 @@ export default function MechanicTopbar({ collapsed }: MechanicTopbarProps) {
         collapsed ? "left-22" : "left-67.5",
       )}
     >
-      <div />
+      <div>
+        <p className="text-xs text-muted-foreground">Super Admin</p>
+        <h2 className="text-lg font-semibold text-white">Dashboard Overview</h2>
+      </div>
 
       <div className="flex items-center gap-4">
-        <button className="w-11 h-11 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-all">
+        <button
+          type="button"
+          className="w-11 h-11 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-all"
+        >
           <Bell size={16} />
         </button>
 
@@ -94,7 +100,7 @@ export default function MechanicTopbar({ collapsed }: MechanicTopbarProps) {
           </div>
 
           <div>
-            <p className="text-sm font-semibold">{displayName}</p>
+            <p className="text-sm font-semibold text-white">{displayName}</p>
             <p className="text-xs text-muted-foreground">{displayEmail}</p>
           </div>
         </div>

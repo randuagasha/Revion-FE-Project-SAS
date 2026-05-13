@@ -19,6 +19,18 @@ export interface BookingImage {
   created_at?: string;
 }
 
+export interface BookingProgress {
+  id: number;
+  booking_id: number;
+  status: BookingStatus;
+  notes?: string | null;
+  updated_by?: number | null;
+  updated_by_name?: string | null;
+  images?: BookingImage[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Booking {
   id: number;
   booking_code: string;
@@ -40,14 +52,17 @@ export interface Booking {
 
   brand: string;
   model: string;
+  year?: string | number | null;
   license_plate?: string;
 
   service_name: string;
   price?: number | string | null;
 
   mechanic_name?: string | null;
+  mechanic_email?: string | null;
 
   images?: BookingImage[];
+  progress?: BookingProgress[];
 
   created_at: string;
   updated_at?: string;
@@ -85,6 +100,19 @@ export interface UpdateBookingStatusResponse {
   message?: string;
 }
 
+export interface DeleteBookingResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface GetAllBookingsParams {
+  search?: string;
+  status?: BookingStatus;
+  priority?: BookingPriority;
+  page?: number;
+  limit?: number;
+}
+
 export const bookingService = {
   // CUSTOMER BOOKINGS
   async getMyBookings(): Promise<BookingResponse> {
@@ -94,14 +122,18 @@ export const bookingService = {
   },
 
   async createBooking(payload: FormData): Promise<CreateBookingResponse> {
-    const response = await api.post("/bookings", payload);
+    const response = await api.post("/bookings", payload, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
     return response.data;
   },
 
   // SHARED DETAIL
   // customer / mechanic / super admin
-  async getBookingById(id: string): Promise<SingleBookingResponse> {
+  async getBookingById(id: string | number): Promise<SingleBookingResponse> {
     const response = await api.get(`/bookings/${id}`);
 
     return response.data;
@@ -127,13 +159,9 @@ export const bookingService = {
   },
 
   // SUPER ADMIN BOOKINGS
-  async getAllBookings(params?: {
-    search?: string;
-    status?: BookingStatus;
-    priority?: BookingPriority;
-    page?: number;
-    limit?: number;
-  }) {
+  async getAllBookings(
+    params?: GetAllBookingsParams,
+  ): Promise<BookingResponse> {
     const response = await api.get("/bookings", {
       params,
     });
@@ -144,7 +172,7 @@ export const bookingService = {
   // STATUS ACTION
   // mechanic / super admin
   async updateBookingStatus(
-    id: string,
+    id: string | number,
     status: BookingStatus,
   ): Promise<UpdateBookingStatusResponse> {
     const response = await api.put(`/bookings/${id}/status`, {
@@ -156,7 +184,7 @@ export const bookingService = {
 
   // DELETE
   // super admin only
-  async deleteBooking(id: string) {
+  async deleteBooking(id: string | number): Promise<DeleteBookingResponse> {
     const response = await api.delete(`/bookings/${id}`);
 
     return response.data;

@@ -1,12 +1,86 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import CustomerSidebar from "./components/sidebar";
 import { Bell } from "lucide-react";
 
+interface LoggedInUser {
+  id?: number;
+  name?: string;
+  email?: string;
+  role?: "customer" | "mechanic" | "super_admin";
+}
+
 const cn = (...classes: Array<string | false | null | undefined>) => {
   return classes.filter(Boolean).join(" ");
+};
+
+// =========================
+// SUBSCRIBE SIDEBAR STATE
+// =========================
+const subscribeSidebar = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  window.addEventListener("customer-sidebar-toggle", callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("customer-sidebar-toggle", callback);
+  };
+};
+
+const getSidebarSnapshot = () => {
+  if (typeof window === "undefined") return "false";
+
+  return window.localStorage.getItem("customer-sidebar-collapsed") || "false";
+};
+
+const getSidebarServerSnapshot = () => "false";
+
+// =========================
+// SUBSCRIBE USER STATE
+// =========================
+const subscribeUser = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  window.addEventListener("user-updated", callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("user-updated", callback);
+  };
+};
+
+const getUserSnapshot = () => {
+  if (typeof window === "undefined") return "";
+
+  return window.localStorage.getItem("user") || "";
+};
+
+const getUserServerSnapshot = () => "";
+
+const parseUser = (rawUser: string): LoggedInUser | null => {
+  if (!rawUser) return null;
+
+  try {
+    return JSON.parse(rawUser) as LoggedInUser;
+  } catch (error) {
+    console.error("Failed to parse user:", error);
+    return null;
+  }
+};
+
+const getInitial = (name?: string, email?: string) => {
+  const value = name || email || "R";
+
+  return value.charAt(0).toUpperCase();
+};
+
+const getRoleLabel = (role?: string) => {
+  if (role === "customer") return "Customer";
+  if (role === "mechanic") return "Mechanic";
+  if (role === "super_admin") return "Super Admin";
+
+  return "User";
 };
 
 export default function CustomerLayout({
@@ -14,32 +88,24 @@ export default function CustomerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const sidebarRaw = useSyncExternalStore(
+    subscribeSidebar,
+    getSidebarSnapshot,
+    getSidebarServerSnapshot,
+  );
 
-  useEffect(() => {
-    const savedSidebarState = window.localStorage.getItem(
-      "customer-sidebar-collapsed",
-    );
+  const rawUser = useSyncExternalStore(
+    subscribeUser,
+    getUserSnapshot,
+    getUserServerSnapshot,
+  );
 
-    if (savedSidebarState !== null) {
-      setCollapsed(savedSidebarState === "true");
-    }
+  const collapsed = sidebarRaw === "true";
+  const user = parseUser(rawUser);
 
-    const handleSidebarToggle = (event: Event) => {
-      const customEvent = event as CustomEvent<{ collapsed: boolean }>;
-
-      setCollapsed(customEvent.detail.collapsed);
-    };
-
-    window.addEventListener("customer-sidebar-toggle", handleSidebarToggle);
-
-    return () => {
-      window.removeEventListener(
-        "customer-sidebar-toggle",
-        handleSidebarToggle,
-      );
-    };
-  }, []);
+  const displayName = user?.name || getRoleLabel(user?.role);
+  const displayEmail = user?.email || "-";
+  const initial = getInitial(user?.name, user?.email);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -59,14 +125,13 @@ export default function CustomerLayout({
 
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-[#522C14] text-white flex items-center justify-center font-semibold">
-              R
+              {initial}
             </div>
 
             <div className="hidden md:block">
-              <p className="text-sm font-semibold">Customer</p>
-              <p className="text-xs text-muted-foreground">
-                customer@revion.com
-              </p>
+              <p className="text-sm font-semibold">{displayName}</p>
+
+              <p className="text-xs text-muted-foreground">{displayEmail}</p>
             </div>
           </div>
         </div>
