@@ -24,9 +24,9 @@ import {
 
 import {
   ticketService,
-  Ticket,
-  TicketMessage,
-  TicketStatus,
+  type Ticket as TicketData,
+  type TicketMessage,
+  type TicketStatus,
 } from "@/services/ticket.service";
 
 interface MessageForm {
@@ -80,36 +80,38 @@ const statusConfig: Record<
   },
 };
 
+const statusOptions: TicketStatus[] = [
+  "open",
+  "in_review",
+  "resolved",
+  "closed",
+];
+
 const getInitialForm = (): MessageForm => ({
   message: "",
   attachment: null,
 });
 
-export default function TicketDetailPage() {
+export default function MechanicTicketDetailPage() {
   const params = useParams();
 
   const ticketId = params.id as string;
 
-  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [ticket, setTicket] = useState<TicketData | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const [preview, setPreview] = useState<string | null>(null);
 
   const [form, setForm] = useState<MessageForm>(getInitialForm);
 
-  const status = ticket
-    ? statusConfig[ticket.status] || statusConfig.open
-    : statusConfig.open;
+  const refreshTicketDetail = async () => {
+    if (!ticketId) return;
 
-  const StatusIcon = status.icon;
-
-  const fetchTicketDetail = async () => {
     try {
-      setLoading(true);
-
       const [ticketResponse, messageResponse] = await Promise.all([
         ticketService.getTicketById(ticketId),
         ticketService.getTicketMessages(ticketId),
@@ -118,24 +120,52 @@ export default function TicketDetailPage() {
       setTicket(ticketResponse.data);
       setMessages(messageResponse.data || []);
     } catch (error) {
-      console.error("Failed fetch ticket detail:", error);
-    } finally {
-      setLoading(false);
+      console.error("Failed refresh ticket detail:", error);
     }
   };
 
+  const status = ticket
+    ? statusConfig[ticket.status] || statusConfig.open
+    : statusConfig.open;
+
+  const StatusIcon = status.icon;
+
   useEffect(() => {
+    let mounted = true;
+
     const loadTicketDetail = async () => {
+      if (!ticketId) {
+        if (mounted) {
+          setLoading(false);
+        }
+
+        return;
+      }
+
       try {
-        await fetchTicketDetail();
+        const [ticketResponse, messageResponse] = await Promise.all([
+          ticketService.getTicketById(ticketId),
+          ticketService.getTicketMessages(ticketId),
+        ]);
+
+        if (!mounted) return;
+
+        setTicket(ticketResponse.data);
+        setMessages(messageResponse.data || []);
       } catch (error) {
-        console.error("Failed to load ticket detail:", error);
+        console.error("Failed fetch ticket detail:", error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    if (ticketId) {
-      void loadTicketDetail();
-    }
+    void loadTicketDetail();
+
+    return () => {
+      mounted = false;
+    };
   }, [ticketId]);
 
   const formatDate = (date?: string) => {
@@ -216,6 +246,30 @@ export default function TicketDetailPage() {
     setPreview(null);
   };
 
+  const handleUpdateStatus = async (statusValue: TicketStatus) => {
+    if (!ticketId) return;
+
+    try {
+      setStatusLoading(true);
+
+      await ticketService.updateTicketStatus(ticketId, statusValue);
+
+      setTicket((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          status: statusValue,
+        };
+      });
+    } catch (error) {
+      console.error("Failed to update ticket status:", error);
+      alert("Failed to update ticket status");
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -241,7 +295,7 @@ export default function TicketDetailPage() {
       setForm(getInitialForm());
       setPreview(null);
 
-      await fetchTicketDetail();
+      await refreshTicketDetail();
     } catch (error) {
       console.error("Send message failed:", error);
       alert("Failed to send message. Check backend terminal for details.");
@@ -266,7 +320,7 @@ export default function TicketDetailPage() {
     return (
       <div className="min-h-screen bg-background text-foreground p-8">
         <Link
-          href="/customers/tickets"
+          href="/mechanics/tickets"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition"
         >
           <ArrowLeft size={16} />
@@ -290,7 +344,7 @@ export default function TicketDetailPage() {
       <div className="flex items-start justify-between gap-5 mb-8">
         <div>
           <Link
-            href="/customers/tickets"
+            href="/mechanics/tickets"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition mb-4"
           >
             <ArrowLeft size={16} />
@@ -300,7 +354,7 @@ export default function TicketDetailPage() {
           <h1 className="text-3xl font-bold tracking-tight">Ticket Detail</h1>
 
           <p className="text-sm text-muted-foreground mt-1">
-            View and continue your support consultation.
+            View and respond to customer support consultation.
           </p>
         </div>
 
@@ -364,7 +418,9 @@ export default function TicketDetailPage() {
               </div>
             ) : (
               groupedMessages.map((message) => {
-                const isCustomer = message.sender_role === "customer";
+                const isMechanic = message.sender_role === "mechanic";
+                const isAdmin = message.sender_role === "super_admin";
+                const isOwnMessage = isMechanic || isAdmin;
 
                 const attachmentUrl = getAttachmentUrl(
                   message.attachment,
@@ -375,12 +431,12 @@ export default function TicketDetailPage() {
                   <div
                     key={message.id}
                     className={`flex ${
-                      isCustomer ? "justify-end" : "justify-start"
+                      isOwnMessage ? "justify-end" : "justify-start"
                     }`}
                   >
                     <div
                       className={`max-w-[78%] rounded-3xl p-4 border ${
-                        isCustomer
+                        isOwnMessage
                           ? "bg-[#522C14] border-[#522C14] text-white"
                           : "bg-background border-border"
                       }`}
@@ -388,7 +444,7 @@ export default function TicketDetailPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <div
                           className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                            isCustomer
+                            isOwnMessage
                               ? "bg-white/15"
                               : "bg-[#522C1415] border border-[#522C1430]"
                           }`}
@@ -396,7 +452,7 @@ export default function TicketDetailPage() {
                           <UserRound
                             size={15}
                             className={
-                              isCustomer ? "text-white" : "text-[#C2692A]"
+                              isOwnMessage ? "text-white" : "text-[#C2692A]"
                             }
                           />
                         </div>
@@ -408,7 +464,7 @@ export default function TicketDetailPage() {
 
                           <p
                             className={`text-[11px] capitalize ${
-                              isCustomer
+                              isOwnMessage
                                 ? "text-white/60"
                                 : "text-muted-foreground"
                             }`}
@@ -426,7 +482,7 @@ export default function TicketDetailPage() {
                       {attachmentUrl && (
                         <div
                           className={`mt-4 rounded-2xl overflow-hidden border ${
-                            isCustomer ? "border-white/15" : "border-border"
+                            isOwnMessage ? "border-white/15" : "border-border"
                           }`}
                         >
                           {isImageUrl(attachmentUrl) ? (
@@ -445,7 +501,7 @@ export default function TicketDetailPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`flex items-center gap-3 p-4 transition ${
-                                isCustomer
+                                isOwnMessage
                                   ? "hover:bg-white/10"
                                   : "hover:bg-accent"
                               }`}
@@ -471,6 +527,7 @@ export default function TicketDetailPage() {
             {isClosed ? (
               <div className="rounded-2xl border border-border bg-background p-5 text-center">
                 <p className="text-sm font-semibold">Ticket Closed</p>
+
                 <p className="text-sm text-muted-foreground mt-1">
                   This ticket is closed and cannot receive new messages.
                 </p>
@@ -525,6 +582,7 @@ export default function TicketDetailPage() {
                           src={preview}
                           alt="Attachment preview"
                           fill
+                          unoptimized
                           className="object-cover"
                         />
                       </div>
@@ -579,6 +637,7 @@ export default function TicketDetailPage() {
             <div className="space-y-4 mt-5">
               <div>
                 <p className="text-xs text-muted-foreground">Code</p>
+
                 <p className="text-sm font-semibold mt-1">
                   {ticket.ticket_code}
                 </p>
@@ -586,11 +645,13 @@ export default function TicketDetailPage() {
 
               <div>
                 <p className="text-xs text-muted-foreground">Subject</p>
+
                 <p className="text-sm font-semibold mt-1">{ticket.subject}</p>
               </div>
 
               <div>
                 <p className="text-xs text-muted-foreground">Created At</p>
+
                 <p className="text-sm font-semibold mt-1">
                   {formatDate(ticket.created_at)}
                 </p>
@@ -618,6 +679,25 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
               </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Update Status</p>
+
+                <select
+                  value={ticket.status}
+                  onChange={(e) =>
+                    handleUpdateStatus(e.target.value as TicketStatus)
+                  }
+                  disabled={statusLoading}
+                  className="mt-2 w-full h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none focus:border-[#C2692A] transition disabled:opacity-60"
+                >
+                  {statusOptions.map((item) => (
+                    <option key={item} value={item} className="bg-[#0A0A0A]">
+                      {statusConfig[item].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -632,6 +712,7 @@ export default function TicketDetailPage() {
             <div className="space-y-4 mt-5">
               <div>
                 <p className="text-xs text-muted-foreground">Vehicle</p>
+
                 <p className="text-sm font-semibold mt-1">
                   {ticket.brand && ticket.model
                     ? `${ticket.brand} ${ticket.model}`
@@ -652,6 +733,7 @@ export default function TicketDetailPage() {
             <div className="space-y-4 mt-5">
               <div>
                 <p className="text-xs text-muted-foreground">Name</p>
+
                 <p className="text-sm font-semibold mt-1">
                   {ticket.customer_name || "-"}
                 </p>
@@ -668,9 +750,9 @@ export default function TicketDetailPage() {
             <h2 className="text-lg font-bold">Support Flow</h2>
 
             <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-              Admin will review your consultation ticket and reply in this
-              conversation. You can continue sending additional information or
-              attachments while the ticket is still open.
+              This ticket is related to a vehicle handled by you. Reply to the
+              customer and update the ticket status when the issue is reviewed
+              or resolved.
             </p>
           </div>
         </div>

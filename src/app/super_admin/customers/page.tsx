@@ -10,11 +10,10 @@ import {
   Plus,
   Search,
   Trash2,
-  UserCog,
-  Wrench,
+  User,
+  Users,
   Pencil,
-  Activity,
-  ShieldCheck,
+  CalendarDays,
 } from "lucide-react";
 
 import {
@@ -32,89 +31,57 @@ const formatDate = (date?: string) => {
   }).format(new Date(date));
 };
 
-const getAvailabilityClass = (availability?: string | null) => {
-  switch (availability) {
-    case "available":
-      return "border-green-500/20 bg-green-500/10 text-green-400";
-    case "busy":
-      return "border-yellow-500/20 bg-yellow-500/10 text-yellow-400";
-    case "offline":
-      return "border-red-500/20 bg-red-500/10 text-red-400";
-    default:
-      return "border-white/10 bg-white/5 text-muted-foreground";
-  }
-};
-
-const formatAvailability = (availability?: string | null) => {
-  if (!availability) return "Unknown";
-
-  return availability.charAt(0).toUpperCase() + availability.slice(1);
-};
-
-export default function SuperAdminMechanicsPage() {
-  const [mechanics, setMechanics] = useState<AdminUser[]>([]);
+export default function SuperAdminCustomersPage() {
+  const [customers, setCustomers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [pageError, setPageError] = useState("");
 
   useEffect(() => {
-    const fetchMechanics = async () => {
+    const fetchCustomers = async () => {
       try {
         setLoading(true);
         setPageError("");
 
         const response = await adminUserService.getUsers({
-          role: "mechanic",
+          role: "customer",
         });
 
-        const mechanicData = (response.data || []).filter((user) => {
-          return user.role === "mechanic";
+        const customerData = (response.data || []).filter((user) => {
+          return user.role === "customer";
         });
 
-        setMechanics(mechanicData);
+        setCustomers(customerData);
       } catch (error) {
-        console.error("Failed to fetch mechanics:", error);
-        setMechanics([]);
-        setPageError("Failed to load mechanic accounts.");
+        console.error("Failed to fetch customers:", error);
+        setCustomers([]);
+        setPageError("Failed to load customer accounts.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMechanics();
+    fetchCustomers();
   }, []);
-
-  const filteredMechanics = useMemo(() => {
+  
+  const filteredCustomers = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    if (!keyword) return mechanics;
+    if (!keyword) return customers;
 
-    return mechanics.filter((mechanic) => {
+    return customers.filter((customer) => {
       return (
-        mechanic.name.toLowerCase().includes(keyword) ||
-        mechanic.email.toLowerCase().includes(keyword) ||
-        mechanic.role.toLowerCase().includes(keyword) ||
-        mechanic.availability?.toLowerCase().includes(keyword)
+        customer.name.toLowerCase().includes(keyword) ||
+        customer.email.toLowerCase().includes(keyword) ||
+        customer.role.toLowerCase().includes(keyword)
       );
     });
-  }, [mechanics, search]);
+  }, [customers, search]);
 
-  const availableMechanics = useMemo(() => {
-    return mechanics.filter((mechanic) => {
-      return mechanic.availability === "available";
-    }).length;
-  }, [mechanics]);
-
-  const busyMechanics = useMemo(() => {
-    return mechanics.filter((mechanic) => {
-      return mechanic.availability === "busy";
-    }).length;
-  }, [mechanics]);
-
-  const handleDeleteMechanic = async (id: number) => {
+  const handleDeleteCustomer = async (id: number) => {
     const confirmDelete = window.confirm(
-      "Are you sure you want to delete this mechanic account?",
+      "Are you sure you want to delete this customer account?",
     );
 
     if (!confirmDelete) return;
@@ -124,10 +91,10 @@ export default function SuperAdminMechanicsPage() {
 
       await adminUserService.deleteUser(id);
 
-      setMechanics((prev) => prev.filter((mechanic) => mechanic.id !== id));
+      setCustomers((prev) => prev.filter((customer) => customer.id !== id));
     } catch (error) {
-      console.error("Failed to delete mechanic:", error);
-      alert("Failed to delete mechanic");
+      console.error("Failed to delete customer:", error);
+      alert("Failed to delete customer");
     } finally {
       setDeleteLoading(null);
     }
@@ -139,87 +106,71 @@ export default function SuperAdminMechanicsPage() {
         <div className="relative z-10 flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div>
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white shadow-lg shadow-[#522C14]/20">
-              <UserCog size={22} />
+              <Users size={22} />
             </div>
 
             <p className="mb-2 text-sm text-muted-foreground">
-              Mechanic Management
+              Customer Management
             </p>
 
             <h1 className="max-w-2xl text-2xl font-bold leading-tight text-white md:text-3xl">
-              Manage Revion mechanic accounts.
+              Manage Revion customer accounts.
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Create and manage mechanic accounts that handle customer booking
-              progress and vehicle services.
+              View, create, update, and remove customer accounts registered in
+              the Revion system.
             </p>
           </div>
 
           <Link
-            href="/super_admin/mechanics/create"
+            href="/super_admin/customers/create"
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#522C14] px-5 text-sm font-semibold text-white transition hover:scale-[1.02] hover:bg-[#63351a]"
           >
             <Plus size={17} />
-            Add Mechanic
+            Add Customer
           </Link>
         </div>
 
         <div className="absolute -right-24 -top-24 h-56 w-56 rounded-full bg-[#522C14]/20 blur-3xl" />
       </section>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
-            <UserCog size={21} />
+            <Users size={21} />
           </div>
 
-          <p className="text-sm text-muted-foreground">Total Mechanics</p>
+          <p className="text-sm text-muted-foreground">Total Customers</p>
           <h2 className="mt-2 text-3xl font-bold text-white">
-            {mechanics.length}
+            {customers.length}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Registered mechanic accounts
+            Registered customer accounts
           </p>
         </div>
 
         <div className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
-            <Activity size={21} />
-          </div>
-
-          <p className="text-sm text-muted-foreground">Available</p>
-          <h2 className="mt-2 text-3xl font-bold text-white">
-            {availableMechanics}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ready to handle bookings
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
-            <Wrench size={21} />
-          </div>
-
-          <p className="text-sm text-muted-foreground">Busy</p>
-          <h2 className="mt-2 text-3xl font-bold text-white">
-            {busyMechanics}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Currently handling jobs
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
-            <ShieldCheck size={21} />
+            <User size={21} />
           </div>
 
           <p className="text-sm text-muted-foreground">Role</p>
-          <h2 className="mt-2 text-3xl font-bold text-white">Mechanic</h2>
+          <h2 className="mt-2 text-3xl font-bold text-white">Customer</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Can update booking progress
+            Booking and vehicle owner
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
+          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
+            <CalendarDays size={21} />
+          </div>
+
+          <p className="text-sm text-muted-foreground">Access</p>
+          <h2 className="mt-2 text-3xl font-bold text-white">User</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Can create bookings and tickets
           </p>
         </div>
       </section>
@@ -227,9 +178,9 @@ export default function SuperAdminMechanicsPage() {
       <section className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
         <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
-            <h2 className="text-xl font-bold text-white">Mechanic List</h2>
+            <h2 className="text-xl font-bold text-white">Customer List</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Search and manage all mechanic accounts.
+              Search and manage all customer accounts.
             </p>
           </div>
 
@@ -238,7 +189,7 @@ export default function SuperAdminMechanicsPage() {
 
             <input
               type="text"
-              placeholder="Search mechanic..."
+              placeholder="Search customer..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-transparent text-sm text-white outline-none placeholder:text-muted-foreground"
@@ -250,7 +201,7 @@ export default function SuperAdminMechanicsPage() {
           <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-border">
             <div className="flex items-center gap-3 text-muted-foreground">
               <Loader2 className="animate-spin" size={22} />
-              <span className="text-sm font-medium">Loading mechanics...</span>
+              <span className="text-sm font-medium">Loading customers...</span>
             </div>
           </div>
         ) : pageError ? (
@@ -259,22 +210,21 @@ export default function SuperAdminMechanicsPage() {
             <h3 className="text-lg font-bold text-white">Failed to load</h3>
             <p className="mt-2 text-sm text-muted-foreground">{pageError}</p>
           </div>
-        ) : filteredMechanics.length === 0 ? (
+        ) : filteredCustomers.length === 0 ? (
           <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-border text-center">
             <AlertCircle size={28} className="mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-bold text-white">No mechanics found</h3>
+            <h3 className="text-lg font-bold text-white">No customers found</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Mechanic accounts will appear here.
+              Customer accounts will appear here.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-border">
-            <table className="w-full min-w-225 text-left text-sm">
+            <table className="w-full min-w-212.5 text-left text-sm">
               <thead className="bg-accent/50 text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-4 font-medium">Mechanic</th>
+                  <th className="px-4 py-4 font-medium">Customer</th>
                   <th className="px-4 py-4 font-medium">Email</th>
-                  <th className="px-4 py-4 font-medium">Availability</th>
                   <th className="px-4 py-4 font-medium">Role</th>
                   <th className="px-4 py-4 font-medium">Created</th>
                   <th className="px-4 py-4 text-right font-medium">Action</th>
@@ -282,23 +232,23 @@ export default function SuperAdminMechanicsPage() {
               </thead>
 
               <tbody>
-                {filteredMechanics.map((mechanic) => (
+                {filteredCustomers.map((customer) => (
                   <tr
-                    key={mechanic.id}
+                    key={customer.id}
                     className="border-t border-border transition hover:bg-accent/40"
                   >
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#522C14] text-white">
-                          {mechanic.name.charAt(0).toUpperCase()}
+                          {customer.name.charAt(0).toUpperCase()}
                         </div>
 
                         <div>
                           <p className="font-semibold text-white">
-                            {mechanic.name}
+                            {customer.name}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            ID: {mechanic.id}
+                            ID: {customer.id}
                           </p>
                         </div>
                       </div>
@@ -307,34 +257,24 @@ export default function SuperAdminMechanicsPage() {
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Mail size={16} />
-                        {mechanic.email}
+                        {customer.email}
                       </div>
                     </td>
 
                     <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getAvailabilityClass(
-                          mechanic.availability,
-                        )}`}
-                      >
-                        {formatAvailability(mechanic.availability)}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <span className="inline-flex rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-400">
-                        Mechanic
+                      <span className="inline-flex rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
+                        Customer
                       </span>
                     </td>
 
                     <td className="px-4 py-4 text-muted-foreground">
-                      {formatDate(mechanic.created_at)}
+                      {formatDate(customer.created_at)}
                     </td>
 
                     <td className="px-4 py-4">
                       <div className="flex justify-end gap-2">
                         <Link
-                          href={`/super_admin/mechanics/edit/${mechanic.id}`}
+                          href={`/super_admin/customers/edit/${customer.id}`}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:bg-[#522C14] hover:text-white"
                         >
                           <Pencil size={16} />
@@ -342,11 +282,11 @@ export default function SuperAdminMechanicsPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteMechanic(mechanic.id)}
-                          disabled={deleteLoading === mechanic.id}
+                          onClick={() => handleDeleteCustomer(customer.id)}
+                          disabled={deleteLoading === customer.id}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {deleteLoading === mechanic.id ? (
+                          {deleteLoading === customer.id ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
                             <Trash2 size={16} />

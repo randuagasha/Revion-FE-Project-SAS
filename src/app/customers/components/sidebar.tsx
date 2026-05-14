@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import {
@@ -53,45 +52,22 @@ const cn = (...classes: Array<string | false | null | undefined>) => {
   return classes.filter(Boolean).join(" ");
 };
 
-export default function CustomerSidebar() {
+interface CustomerSidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export default function CustomerSidebar({
+  collapsed,
+  onToggle,
+}: CustomerSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    const savedSidebarState = window.localStorage.getItem(
-      "customer-sidebar-collapsed",
-    );
-
-    if (savedSidebarState !== null) {
-      setCollapsed(savedSidebarState === "true");
-    }
-  }, []);
-
-  const toggleSidebar = () => {
-    setCollapsed((prev) => {
-      const nextValue = !prev;
-
-      window.localStorage.setItem(
-        "customer-sidebar-collapsed",
-        String(nextValue),
-      );
-
-      window.dispatchEvent(
-        new CustomEvent("customer-sidebar-toggle", {
-          detail: {
-            collapsed: nextValue,
-          },
-        }),
-      );
-
-      return nextValue;
-    });
-  };
-
   const handleLogout = () => {
     window.localStorage.removeItem("token");
+    window.localStorage.removeItem("user");
+    window.localStorage.removeItem("role");
 
     router.push("/auth/login");
   };
@@ -130,7 +106,7 @@ export default function CustomerSidebar() {
       {/* TOGGLE */}
       <button
         type="button"
-        onClick={toggleSidebar}
+        onClick={onToggle}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         className="absolute -right-4 top-24 w-8 h-8 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-white hover:bg-[#522C14] shadow-lg transition-all"
       >

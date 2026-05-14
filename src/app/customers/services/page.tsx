@@ -5,14 +5,11 @@ import Link from "next/link";
 
 import {
   AlertCircle,
-  ArrowUpRight,
   Banknote,
+  CalendarPlus,
   Clock3,
   Loader2,
-  Pencil,
-  Plus,
   Search,
-  Trash2,
   Wrench,
 } from "lucide-react";
 
@@ -28,22 +25,25 @@ const formatPrice = (price?: number | string | null) => {
   }).format(Number(price));
 };
 
-export default function SuperAdminServicesPage() {
+export default function CustomerServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState<number | null>(null);
+  const [pageError, setPageError] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     const fetchServices = async () => {
       try {
         setLoading(true);
+        setPageError("");
 
         const response = await serviceService.getServices();
 
         setServices(response.data || []);
       } catch (error) {
-        console.error("Failed to fetch services:", error);
+        console.error("Failed to fetch customer services:", error);
+        setServices([]);
+        setPageError("Failed to load available services.");
       } finally {
         setLoading(false);
       }
@@ -67,34 +67,7 @@ export default function SuperAdminServicesPage() {
           .includes(keyword)
       );
     });
-  }, [search, services]);
-
-  const totalWithPrice = useMemo(() => {
-    return services.filter((service) => {
-      return service.price !== null && service.price !== undefined;
-    }).length;
-  }, [services]);
-
-  const handleDeleteService = async (id: number) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this service?",
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-      setDeleteLoading(id);
-
-      await serviceService.deleteService(id);
-
-      setServices((prev) => prev.filter((service) => service.id !== id));
-    } catch (error) {
-      console.error("Failed to delete service:", error);
-      alert("Failed to delete service");
-    } finally {
-      setDeleteLoading(null);
-    }
-  };
+  }, [services, search]);
 
   return (
     <div className="space-y-6">
@@ -107,25 +80,25 @@ export default function SuperAdminServicesPage() {
             </div>
 
             <p className="mb-2 text-sm text-muted-foreground">
-              Service Management
+              Available Services
             </p>
 
             <h1 className="max-w-2xl text-2xl font-bold leading-tight text-white md:text-3xl">
-              Manage Revion service catalog.
+              Explore vehicle services available at Revion.
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Add, update, and organize vehicle services that customers can
-              select when creating a booking.
+              Choose from available maintenance and repair services before
+              creating your vehicle booking request.
             </p>
           </div>
 
           <Link
-            href="/super_admin/services/create"
+            href="/customers/bookings/create"
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#522C14] px-5 text-sm font-semibold text-white transition hover:scale-[1.02] hover:bg-[#63351a]"
           >
-            <Plus size={17} />
-            Add Service
+            <CalendarPlus size={17} />
+            Create Booking
           </Link>
         </div>
 
@@ -146,7 +119,7 @@ export default function SuperAdminServicesPage() {
           </h2>
 
           <p className="mt-2 text-sm text-muted-foreground">
-            Available booking options
+            Available service options
           </p>
         </div>
 
@@ -155,40 +128,38 @@ export default function SuperAdminServicesPage() {
             <Banknote size={21} />
           </div>
 
-          <p className="text-sm text-muted-foreground">Priced Services</p>
+          <p className="text-sm text-muted-foreground">Transparent Price</p>
 
-          <h2 className="mt-2 text-3xl font-bold text-white">
-            {totalWithPrice}
-          </h2>
+          <h2 className="mt-2 text-3xl font-bold text-white">Listed</h2>
 
           <p className="mt-2 text-sm text-muted-foreground">
-            Services with listed prices
+            View estimated service cost
           </p>
         </div>
 
         <div className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
-            <ArrowUpRight size={21} />
+            <Clock3 size={21} />
           </div>
 
-          <p className="text-sm text-muted-foreground">Management Access</p>
+          <p className="text-sm text-muted-foreground">Estimated Duration</p>
 
-          <h2 className="mt-2 text-3xl font-bold text-white">Admin</h2>
+          <h2 className="mt-2 text-3xl font-bold text-white">Visible</h2>
 
           <p className="mt-2 text-sm text-muted-foreground">
-            Only super admin can manage
+            Know the estimated time
           </p>
         </div>
       </section>
 
-      {/* LIST */}
+      {/* SERVICES */}
       <section className="rounded-3xl border border-border bg-card/40 p-5 backdrop-blur-xl">
         <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
-            <h2 className="text-xl font-bold text-white">Service List</h2>
+            <h2 className="text-xl font-bold text-white">Service Catalog</h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Create, update, and remove available services from the system.
+              Browse services provided by Revion garage.
             </p>
           </div>
 
@@ -209,9 +180,22 @@ export default function SuperAdminServicesPage() {
           <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-border">
             <div className="flex items-center gap-3 text-muted-foreground">
               <Loader2 className="animate-spin" size={22} />
-
               <span className="text-sm font-medium">Loading services...</span>
             </div>
+          </div>
+        ) : pageError ? (
+          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-red-500/20 bg-red-500/5 text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-red-500/10">
+              <AlertCircle size={24} className="text-red-400" />
+            </div>
+
+            <h3 className="text-lg font-bold text-white">
+              Failed to load services
+            </h3>
+
+            <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              {pageError}
+            </p>
           </div>
         ) : filteredServices.length === 0 ? (
           <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-border text-center">
@@ -221,18 +205,9 @@ export default function SuperAdminServicesPage() {
 
             <h3 className="text-lg font-bold text-white">No services found</h3>
 
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              Add your first service so customers can start booking vehicle
-              maintenance.
+            <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              Try another keyword or check again later.
             </p>
-
-            <Link
-              href="/super_admin/services/create"
-              className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#522C14] px-5 text-sm font-semibold text-white transition hover:scale-[1.02] hover:bg-[#63351a]"
-            >
-              <Plus size={17} />
-              Add Service
-            </Link>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -241,45 +216,19 @@ export default function SuperAdminServicesPage() {
                 key={service.id}
                 className="group rounded-2xl border border-border bg-background/40 p-5 transition hover:-translate-y-1 hover:bg-accent/40"
               >
-                <div className="mb-5 flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#522C14] text-white shadow-lg shadow-[#522C14]/20">
-                      <Wrench size={18} />
-                    </div>
-
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-white">
-                        {service.name}
-                      </h3>
-
-                      <p className="text-xs text-muted-foreground">
-                        Service ID #{service.id}
-                      </p>
-                    </div>
+                <div className="mb-5 flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#522C14] text-white shadow-lg shadow-[#522C14]/20">
+                    <Wrench size={18} />
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-                    <Link
-                      href={`/super_admin/services/edit/${service.id}`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:bg-[#522C14] hover:text-white"
-                      title="Edit service"
-                    >
-                      <Pencil size={16} />
-                    </Link>
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold text-white">
+                      {service.name}
+                    </h3>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteService(service.id)}
-                      disabled={deleteLoading === service.id}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      title="Delete service"
-                    >
-                      {deleteLoading === service.id ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
+                    <p className="text-xs text-muted-foreground">
+                      Revion Service
+                    </p>
                   </div>
                 </div>
 
@@ -291,7 +240,6 @@ export default function SuperAdminServicesPage() {
                   <div className="rounded-xl border border-border bg-card/40 p-3">
                     <div className="mb-2 flex items-center gap-2 text-muted-foreground">
                       <Banknote size={15} />
-
                       <span className="text-xs">Price</span>
                     </div>
 
@@ -303,7 +251,6 @@ export default function SuperAdminServicesPage() {
                   <div className="rounded-xl border border-border bg-card/40 p-3">
                     <div className="mb-2 flex items-center gap-2 text-muted-foreground">
                       <Clock3 size={15} />
-
                       <span className="text-xs">Duration</span>
                     </div>
 
@@ -312,6 +259,14 @@ export default function SuperAdminServicesPage() {
                     </p>
                   </div>
                 </div>
+
+                <Link
+                  href={`/customers/bookings`}
+                  className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#522C14] px-5 text-sm font-semibold text-white transition hover:scale-[1.01] hover:bg-[#63351a]"
+                >
+                  <CalendarPlus size={17} />
+                  Book This Service
+                </Link>
               </div>
             ))}
           </div>

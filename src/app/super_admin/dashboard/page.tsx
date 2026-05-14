@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 import {
@@ -20,6 +20,42 @@ import {
 
 import { bookingService, type Booking } from "@/services/booking.service";
 import { serviceService, type Service } from "@/services/service.service";
+
+interface LoggedInUser {
+  id?: number;
+  name?: string;
+  email?: string;
+  role?: "customer" | "mechanic" | "super_admin";
+}
+
+const subscribeUser = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  window.addEventListener("user-updated", callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("user-updated", callback);
+  };
+};
+
+const getUserSnapshot = () => {
+  if (typeof window === "undefined") return "";
+
+  return window.localStorage.getItem("user") || "";
+};
+
+const getServerUserSnapshot = () => "";
+
+const parseUser = (rawUser: string): LoggedInUser | null => {
+  if (!rawUser) return null;
+
+  try {
+    return JSON.parse(rawUser) as LoggedInUser;
+  } catch (error) {
+    console.error("Failed to parse user:", error);
+    return null;
+  }
+};
 
 const formatLabel = (value?: string) => {
   if (!value) return "-";
@@ -72,6 +108,18 @@ export default function SuperAdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [bookingError, setBookingError] = useState(false);
   const [serviceError, setServiceError] = useState(false);
+
+  const rawUser = useSyncExternalStore(
+    subscribeUser,
+    getUserSnapshot,
+    getServerUserSnapshot,
+  );
+
+  const currentUser = useMemo(() => {
+    return parseUser(rawUser);
+  }, [rawUser]);
+
+  const displayName = currentUser?.name || "Admin";
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -227,7 +275,7 @@ export default function SuperAdminDashboardPage() {
             </p>
 
             <h1 className="max-w-2xl text-2xl font-bold leading-tight text-white md:text-3xl">
-              Welcome back, Super Admin.
+              Welcome back, {displayName}
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -353,7 +401,7 @@ export default function SuperAdminDashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-border">
-              <table className="w-full min-w-[780px] text-left text-sm">
+              <table className="w-full min-w-196 text-left text-sm">
                 <thead className="bg-accent/50 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-4 font-medium">Booking</th>
@@ -459,9 +507,7 @@ export default function SuperAdminDashboardPage() {
                 <div className="flex items-center gap-3">
                   <Wrench size={18} />
 
-                  <span className="text-sm font-semibold">
-                    Manage Services
-                  </span>
+                  <span className="text-sm font-semibold">Manage Services</span>
                 </div>
 
                 <ArrowUpRight size={16} />
@@ -474,9 +520,7 @@ export default function SuperAdminDashboardPage() {
                 <div className="flex items-center gap-3">
                   <CalendarCheck size={18} />
 
-                  <span className="text-sm font-semibold">
-                    Manage Bookings
-                  </span>
+                  <span className="text-sm font-semibold">Manage Bookings</span>
                 </div>
 
                 <ArrowUpRight size={16} />
@@ -517,9 +561,7 @@ export default function SuperAdminDashboardPage() {
                 <div className="flex items-center gap-3">
                   <Ticket size={18} />
 
-                  <span className="text-sm font-semibold">
-                    Support Tickets
-                  </span>
+                  <span className="text-sm font-semibold">Support Tickets</span>
                 </div>
 
                 <ArrowUpRight size={16} />

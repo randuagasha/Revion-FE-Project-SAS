@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { Bell } from "lucide-react";
+import NotificationDropdown from "@/components/layout/notification-dropdown";
 
 interface LoggedInUser {
   id?: number;
@@ -10,7 +10,7 @@ interface LoggedInUser {
   role?: "customer" | "mechanic" | "super_admin";
 }
 
-interface SuperAdminTopbarProps {
+interface CustomerTopbarProps {
   collapsed: boolean;
 }
 
@@ -18,7 +18,8 @@ const cn = (...classes: Array<string | false | null | undefined>) => {
   return classes.filter(Boolean).join(" ");
 };
 
-const subscribe = (callback: () => void) => {
+// SUBSCRIBE USER STATE
+const subscribeUser = (callback: () => void) => {
   window.addEventListener("storage", callback);
   window.addEventListener("user-updated", callback);
 
@@ -28,13 +29,13 @@ const subscribe = (callback: () => void) => {
   };
 };
 
-const getSnapshot = () => {
+const getUserSnapshot = () => {
   if (typeof window === "undefined") return "";
 
   return window.localStorage.getItem("user") || "";
 };
 
-const getServerSnapshot = () => "";
+const getUserServerSnapshot = () => "";
 
 const parseUser = (rawUser: string): LoggedInUser | null => {
   if (!rawUser) return null;
@@ -47,25 +48,25 @@ const parseUser = (rawUser: string): LoggedInUser | null => {
   }
 };
 
+const getInitial = (name?: string, email?: string) => {
+  const value = name || email || "R";
+
+  return value.charAt(0).toUpperCase();
+};
+
 const getRoleLabel = (role?: string) => {
   if (role === "customer") return "Customer";
   if (role === "mechanic") return "Mechanic";
   if (role === "super_admin") return "Super Admin";
 
-  return "Super Admin";
+  return "User";
 };
 
-const getInitial = (name?: string, email?: string) => {
-  const value = name || email || "S";
-
-  return value.charAt(0).toUpperCase();
-};
-
-export default function SuperAdminTopbar({ collapsed }: SuperAdminTopbarProps) {
+export default function CustomerTopbar({ collapsed }: CustomerTopbarProps) {
   const rawUser = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
+    subscribeUser,
+    getUserSnapshot,
+    getUserServerSnapshot,
   );
 
   const user = parseUser(rawUser);
@@ -77,30 +78,20 @@ export default function SuperAdminTopbar({ collapsed }: SuperAdminTopbarProps) {
   return (
     <header
       className={cn(
-        "fixed top-0 right-0 z-40 h-20 border-b border-border px-8 flex items-center justify-between bg-background/80 backdrop-blur-xl transition-all duration-300",
+        "fixed top-0 right-0 z-40 h-20 border-b border-border bg-background/80 backdrop-blur-xl transition-all duration-300",
         collapsed ? "left-22" : "left-67.5",
       )}
     >
-      <div>
-        <p className="text-xs text-muted-foreground">Super Admin</p>
-        <h2 className="text-lg font-semibold text-white">Dashboard Overview</h2>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          className="w-11 h-11 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-all"
-        >
-          <Bell size={16} />
-        </button>
+      <div className="h-full px-8 flex items-center justify-end gap-4">
+        <NotificationDropdown />
 
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-[#522C14] flex items-center justify-center text-sm font-bold text-white">
+          <div className="w-11 h-11 rounded-2xl bg-[#522C14] text-white flex items-center justify-center font-semibold">
             {initial}
           </div>
 
-          <div>
-            <p className="text-sm font-semibold text-white">{displayName}</p>
+          <div className="hidden md:block">
+            <p className="text-sm font-semibold">{displayName}</p>
             <p className="text-xs text-muted-foreground">{displayEmail}</p>
           </div>
         </div>

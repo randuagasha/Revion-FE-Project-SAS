@@ -158,6 +158,12 @@ export const bookingService = {
     return response.data;
   },
 
+  async acceptBooking(id: string | number) {
+    const response = await api.put(`/bookings/${id}/accept`);
+
+    return response.data;
+  },
+
   // SUPER ADMIN BOOKINGS
   async getAllBookings(
     params?: GetAllBookingsParams,

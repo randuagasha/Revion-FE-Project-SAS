@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import {
-  ArrowLeft,
   AlertCircle,
+  ArrowLeft,
   Car,
   CheckCircle,
   Clock,
@@ -24,9 +24,9 @@ import {
 
 import {
   ticketService,
-  Ticket,
-  TicketMessage,
-  TicketStatus,
+  type Ticket as TicketData,
+  type TicketMessage,
+  type TicketStatus,
 } from "@/services/ticket.service";
 
 interface MessageForm {
@@ -80,21 +80,29 @@ const statusConfig: Record<
   },
 };
 
+const statusOptions: TicketStatus[] = [
+  "open",
+  "in_review",
+  "resolved",
+  "closed",
+];
+
 const getInitialForm = (): MessageForm => ({
   message: "",
   attachment: null,
 });
 
-export default function TicketDetailPage() {
-  const params = useParams();
+export default function SuperAdminTicketDetailPage() {
+  const params = useParams<{ id: string }>();
 
-  const ticketId = params.id as string;
+  const ticketId = params.id;
 
-  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [ticket, setTicket] = useState<TicketData | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const [preview, setPreview] = useState<string | null>(null);
 
@@ -106,10 +114,48 @@ export default function TicketDetailPage() {
 
   const StatusIcon = status.icon;
 
-  const fetchTicketDetail = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    let mounted = true;
 
+    const loadTicketDetail = async () => {
+      if (!ticketId) {
+        if (mounted) {
+          setLoading(false);
+        }
+
+        return;
+      }
+
+      try {
+        const [ticketResponse, messageResponse] = await Promise.all([
+          ticketService.getTicketById(ticketId),
+          ticketService.getTicketMessages(ticketId),
+        ]);
+
+        if (!mounted) return;
+
+        setTicket(ticketResponse.data);
+        setMessages(messageResponse.data || []);
+      } catch (error) {
+        console.error("Failed fetch ticket detail:", error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadTicketDetail();
+
+    return () => {
+      mounted = false;
+    };
+  }, [ticketId]);
+
+  const refreshTicketDetail = async () => {
+    if (!ticketId) return;
+
+    try {
       const [ticketResponse, messageResponse] = await Promise.all([
         ticketService.getTicketById(ticketId),
         ticketService.getTicketMessages(ticketId),
@@ -118,25 +164,9 @@ export default function TicketDetailPage() {
       setTicket(ticketResponse.data);
       setMessages(messageResponse.data || []);
     } catch (error) {
-      console.error("Failed fetch ticket detail:", error);
-    } finally {
-      setLoading(false);
+      console.error("Failed refresh ticket detail:", error);
     }
   };
-
-  useEffect(() => {
-    const loadTicketDetail = async () => {
-      try {
-        await fetchTicketDetail();
-      } catch (error) {
-        console.error("Failed to load ticket detail:", error);
-      }
-    };
-
-    if (ticketId) {
-      void loadTicketDetail();
-    }
-  }, [ticketId]);
 
   const formatDate = (date?: string) => {
     if (!date) return "-";
@@ -216,6 +246,30 @@ export default function TicketDetailPage() {
     setPreview(null);
   };
 
+  const handleUpdateStatus = async (statusValue: TicketStatus) => {
+    if (!ticketId) return;
+
+    try {
+      setStatusLoading(true);
+
+      await ticketService.updateTicketStatus(ticketId, statusValue);
+
+      setTicket((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          status: statusValue,
+        };
+      });
+    } catch (error) {
+      console.error("Failed to update ticket status:", error);
+      alert("Failed to update ticket status");
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -241,7 +295,7 @@ export default function TicketDetailPage() {
       setForm(getInitialForm());
       setPreview(null);
 
-      await fetchTicketDetail();
+      await refreshTicketDetail();
     } catch (error) {
       console.error("Send message failed:", error);
       alert("Failed to send message. Check backend terminal for details.");
@@ -256,7 +310,7 @@ export default function TicketDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background text-foreground p-8 flex items-center justify-center">
+      <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center rounded-3xl border border-border bg-card/40 backdrop-blur-xl">
         <Loader2 className="animate-spin text-[#C2692A]" />
       </div>
     );
@@ -264,16 +318,16 @@ export default function TicketDetailPage() {
 
   if (!ticket) {
     return (
-      <div className="min-h-screen bg-background text-foreground p-8">
+      <div className="space-y-6">
         <Link
-          href="/customers/tickets"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition"
+          href="/super_admin/tickets"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
         >
           <ArrowLeft size={16} />
           Back to tickets
         </Link>
 
-        <div className="h-72 mt-8 rounded-3xl border border-border bg-card flex items-center justify-center">
+        <div className="flex h-72 items-center justify-center rounded-3xl border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             Ticket detail not found.
           </p>
@@ -285,13 +339,13 @@ export default function TicketDetailPage() {
   const isClosed = ticket.status === "closed";
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-8">
+    <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex items-start justify-between gap-5 mb-8">
+      <div className="flex items-start justify-between gap-5">
         <div>
           <Link
-            href="/customers/tickets"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition mb-4"
+            href="/super_admin/tickets"
+            className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
           >
             <ArrowLeft size={16} />
             Back to tickets
@@ -299,13 +353,13 @@ export default function TicketDetailPage() {
 
           <h1 className="text-3xl font-bold tracking-tight">Ticket Detail</h1>
 
-          <p className="text-sm text-muted-foreground mt-1">
-            View and continue your support consultation.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Monitor and respond to customer support conversations.
           </p>
         </div>
 
         <div
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border"
+          className="inline-flex items-center gap-2 rounded-xl border px-4 py-2"
           style={{
             background: status.bg,
             borderColor: status.border,
@@ -324,47 +378,48 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
         {/* CHAT AREA */}
-        <div className="rounded-3xl border border-border bg-card overflow-hidden">
+        <div className="overflow-hidden rounded-3xl border border-border bg-card">
           {/* CHAT HEADER */}
-          <div className="p-6 border-b border-border">
+          <div className="border-b border-border p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs text-muted-foreground">Ticket Code</p>
 
-                <h2 className="text-2xl font-bold mt-1">
+                <h2 className="mt-1 text-2xl font-bold">
                   {ticket.ticket_code}
                 </h2>
 
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {ticket.subject}
                 </p>
               </div>
 
-              <div className="w-12 h-12 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center shrink-0">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
                 <MessageCircle size={24} className="text-[#C2692A]" />
               </div>
             </div>
           </div>
 
           {/* MESSAGES */}
-          <div className="p-6 space-y-5 min-h-115 max-h-160 overflow-y-auto">
+          <div className="max-h-160 min-h-115 space-y-5 overflow-y-auto p-6">
             {groupedMessages.length === 0 ? (
-              <div className="h-80 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center mb-4">
+              <div className="flex h-80 flex-col items-center justify-center text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
                   <MessageCircle size={28} className="text-[#C2692A]" />
                 </div>
 
                 <h3 className="font-semibold">No messages yet</h3>
 
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Start the conversation by sending a message.
                 </p>
               </div>
             ) : (
               groupedMessages.map((message) => {
-                const isCustomer = message.sender_role === "customer";
+                const isAdmin = message.sender_role === "super_admin";
+                const isOwnMessage = isAdmin;
 
                 const attachmentUrl = getAttachmentUrl(
                   message.attachment,
@@ -375,28 +430,28 @@ export default function TicketDetailPage() {
                   <div
                     key={message.id}
                     className={`flex ${
-                      isCustomer ? "justify-end" : "justify-start"
+                      isOwnMessage ? "justify-end" : "justify-start"
                     }`}
                   >
                     <div
-                      className={`max-w-[78%] rounded-3xl p-4 border ${
-                        isCustomer
-                          ? "bg-[#522C14] border-[#522C14] text-white"
-                          : "bg-background border-border"
+                      className={`max-w-[78%] rounded-3xl border p-4 ${
+                        isOwnMessage
+                          ? "border-[#522C14] bg-[#522C14] text-white"
+                          : "border-border bg-background"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="mb-2 flex items-center gap-2">
                         <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                            isCustomer
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                            isOwnMessage
                               ? "bg-white/15"
-                              : "bg-[#522C1415] border border-[#522C1430]"
+                              : "border border-[#522C1430] bg-[#522C1415]"
                           }`}
                         >
                           <UserRound
                             size={15}
                             className={
-                              isCustomer ? "text-white" : "text-[#C2692A]"
+                              isOwnMessage ? "text-white" : "text-[#C2692A]"
                             }
                           />
                         </div>
@@ -408,7 +463,7 @@ export default function TicketDetailPage() {
 
                           <p
                             className={`text-[11px] capitalize ${
-                              isCustomer
+                              isOwnMessage
                                 ? "text-white/60"
                                 : "text-muted-foreground"
                             }`}
@@ -419,14 +474,14 @@ export default function TicketDetailPage() {
                         </div>
                       </div>
 
-                      <p className="text-sm leading-relaxed whitespace-pre-line">
+                      <p className="whitespace-pre-line text-sm leading-relaxed">
                         {message.message}
                       </p>
 
                       {attachmentUrl && (
                         <div
-                          className={`mt-4 rounded-2xl overflow-hidden border ${
-                            isCustomer ? "border-white/15" : "border-border"
+                          className={`mt-4 overflow-hidden rounded-2xl border ${
+                            isOwnMessage ? "border-white/15" : "border-border"
                           }`}
                         >
                           {isImageUrl(attachmentUrl) ? (
@@ -445,7 +500,7 @@ export default function TicketDetailPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`flex items-center gap-3 p-4 transition ${
-                                isCustomer
+                                isOwnMessage
                                   ? "hover:bg-white/10"
                                   : "hover:bg-accent"
                               }`}
@@ -467,11 +522,12 @@ export default function TicketDetailPage() {
           </div>
 
           {/* REPLY FORM */}
-          <div className="p-6 border-t border-border">
+          <div className="border-t border-border p-6">
             {isClosed ? (
               <div className="rounded-2xl border border-border bg-background p-5 text-center">
                 <p className="text-sm font-semibold">Ticket Closed</p>
-                <p className="text-sm text-muted-foreground mt-1">
+
+                <p className="mt-1 text-sm text-muted-foreground">
                   This ticket is closed and cannot receive new messages.
                 </p>
               </div>
@@ -488,19 +544,19 @@ export default function TicketDetailPage() {
                   placeholder="Type your reply..."
                   required
                   rows={4}
-                  className="w-full rounded-2xl border border-border bg-background p-4 text-sm outline-none focus:border-[#C2692A] resize-none transition"
+                  className="w-full resize-none rounded-2xl border border-border bg-background p-4 text-sm outline-none transition focus:border-[#C2692A]"
                 />
 
                 {form.attachment && (
                   <div className="rounded-2xl border border-border bg-background p-4">
                     <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center shrink-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#522C1430] bg-[#522C1415]">
                           <Paperclip size={18} className="text-[#C2692A]" />
                         </div>
 
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">
+                          <p className="truncate text-sm font-semibold">
                             {form.attachment.name}
                           </p>
 
@@ -513,18 +569,19 @@ export default function TicketDetailPage() {
                       <button
                         type="button"
                         onClick={removeAttachment}
-                        className="w-10 h-10 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 transition flex items-center justify-center"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/20 text-red-500 transition hover:bg-red-500/10"
                       >
                         <Trash2 size={15} />
                       </button>
                     </div>
 
                     {preview && (
-                      <div className="relative h-52 rounded-2xl overflow-hidden border border-border mt-4">
+                      <div className="relative mt-4 h-52 overflow-hidden rounded-2xl border border-border">
                         <Image
                           src={preview}
                           alt="Attachment preview"
                           fill
+                          unoptimized
                           className="object-cover"
                         />
                       </div>
@@ -533,7 +590,7 @@ export default function TicketDetailPage() {
                 )}
 
                 <div className="flex items-center gap-3">
-                  <label className="h-11 px-4 rounded-xl border border-border hover:bg-accent transition text-sm font-medium flex items-center gap-2 cursor-pointer">
+                  <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-border px-4 text-sm font-medium transition hover:bg-accent">
                     <Upload size={15} />
                     Attach
                     <input
@@ -546,7 +603,7 @@ export default function TicketDetailPage() {
                   <button
                     type="submit"
                     disabled={submitLoading}
-                    className="flex-1 h-11 rounded-xl bg-[#522C14] hover:bg-[#6B3818] transition-all text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#522C14] text-sm font-medium text-white transition-all hover:bg-[#6B3818] disabled:opacity-60"
                   >
                     {submitLoading ? (
                       <>
@@ -570,28 +627,31 @@ export default function TicketDetailPage() {
         <div className="space-y-6">
           {/* TICKET INFO */}
           <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center mb-5">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
               <MessageCircle size={23} className="text-[#C2692A]" />
             </div>
 
             <h2 className="text-lg font-bold">Ticket Information</h2>
 
-            <div className="space-y-4 mt-5">
+            <div className="mt-5 space-y-4">
               <div>
                 <p className="text-xs text-muted-foreground">Code</p>
-                <p className="text-sm font-semibold mt-1">
+
+                <p className="mt-1 text-sm font-semibold">
                   {ticket.ticket_code}
                 </p>
               </div>
 
               <div>
                 <p className="text-xs text-muted-foreground">Subject</p>
-                <p className="text-sm font-semibold mt-1">{ticket.subject}</p>
+
+                <p className="mt-1 text-sm font-semibold">{ticket.subject}</p>
               </div>
 
               <div>
                 <p className="text-xs text-muted-foreground">Created At</p>
-                <p className="text-sm font-semibold mt-1">
+
+                <p className="mt-1 text-sm font-semibold">
                   {formatDate(ticket.created_at)}
                 </p>
               </div>
@@ -600,7 +660,7 @@ export default function TicketDetailPage() {
                 <p className="text-xs text-muted-foreground">Status</p>
 
                 <div
-                  className="inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg border"
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5"
                   style={{
                     background: status.bg,
                     borderColor: status.border,
@@ -618,21 +678,41 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
               </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Update Status</p>
+
+                <select
+                  value={ticket.status}
+                  onChange={(e) =>
+                    handleUpdateStatus(e.target.value as TicketStatus)
+                  }
+                  disabled={statusLoading}
+                  className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-[#C2692A] disabled:opacity-60"
+                >
+                  {statusOptions.map((item) => (
+                    <option key={item} value={item} className="bg-[#0A0A0A]">
+                      {statusConfig[item].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
           {/* VEHICLE */}
           <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center mb-5">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
               <Car size={23} className="text-[#C2692A]" />
             </div>
 
             <h2 className="text-lg font-bold">Related Vehicle</h2>
 
-            <div className="space-y-4 mt-5">
+            <div className="mt-5 space-y-4">
               <div>
                 <p className="text-xs text-muted-foreground">Vehicle</p>
-                <p className="text-sm font-semibold mt-1">
+
+                <p className="mt-1 text-sm font-semibold">
                   {ticket.brand && ticket.model
                     ? `${ticket.brand} ${ticket.model}`
                     : "No vehicle linked"}
@@ -643,16 +723,17 @@ export default function TicketDetailPage() {
 
           {/* CUSTOMER */}
           <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center mb-5">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
               <UserRound size={23} className="text-[#C2692A]" />
             </div>
 
             <h2 className="text-lg font-bold">Customer</h2>
 
-            <div className="space-y-4 mt-5">
+            <div className="mt-5 space-y-4">
               <div>
                 <p className="text-xs text-muted-foreground">Name</p>
-                <p className="text-sm font-semibold mt-1">
+
+                <p className="mt-1 text-sm font-semibold">
                   {ticket.customer_name || "-"}
                 </p>
               </div>
@@ -661,16 +742,16 @@ export default function TicketDetailPage() {
 
           {/* HELP */}
           <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center mb-5">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
               <Wrench size={23} className="text-[#C2692A]" />
             </div>
 
-            <h2 className="text-lg font-bold">Support Flow</h2>
+            <h2 className="text-lg font-bold">Admin Flow</h2>
 
-            <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-              Admin will review your consultation ticket and reply in this
-              conversation. You can continue sending additional information or
-              attachments while the ticket is still open.
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Super admin can monitor all customer tickets, respond to
+              conversations, and update ticket status when the issue is reviewed
+              or resolved.
             </p>
           </div>
         </div>

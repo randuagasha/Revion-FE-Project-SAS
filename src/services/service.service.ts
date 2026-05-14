@@ -37,7 +37,9 @@ export const serviceService = {
   },
 
   async getServiceById(id: string | number): Promise<SingleServiceResponse> {
-    const response = await api.get(`/services/${id}`);
+    const response = await api.get(`/services/${id}`, {
+      timeout: 10000,
+    });
 
     return response.data;
   },

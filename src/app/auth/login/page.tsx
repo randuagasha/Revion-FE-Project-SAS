@@ -107,7 +107,7 @@ export default function LoginPage() {
       setError("");
 
       const response = (await loginUser({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       })) as LoginResponse;
 

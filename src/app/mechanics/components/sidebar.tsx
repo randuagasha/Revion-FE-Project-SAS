@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   CheckCircle,
+  Ticket,
   Settings,
   LogOut,
   ChevronLeft,
@@ -28,6 +29,11 @@ const menus = [
     label: "Completed Jobs",
     href: "/mechanics/completed",
     icon: CheckCircle,
+  },
+  {
+    label: "Tickets",
+    href: "/mechanics/tickets",
+    icon: Ticket,
   },
   {
     label: "Settings",
@@ -53,9 +59,9 @@ export default function MechanicSidebar({
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("role");
+    window.localStorage.removeItem("token");
+    window.localStorage.removeItem("user");
+    window.localStorage.removeItem("role");
 
     router.push("/auth/login");
   };

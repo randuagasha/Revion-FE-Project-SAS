@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Car,
   CheckCircle,
+  CheckCircle2,
   Clock,
   Eye,
   Loader2,
@@ -68,10 +69,10 @@ const statusConfig: Record<
 
   accepted: {
     label: "Accepted",
-    color: "#F59E0B",
-    bg: "rgba(245,158,11,0.12)",
-    border: "rgba(245,158,11,0.25)",
-    icon: Clock,
+    color: "#22C55E",
+    bg: "rgba(34,197,94,0.12)",
+    border: "rgba(34,197,94,0.25)",
+    icon: CheckCircle2,
   },
 
   inspection: {
@@ -130,60 +131,64 @@ const priorityConfig = {
   },
 };
 
-const filters = ["All", "accepted", "inspection", "in_progress"];
+const filters = ["All", "pending", "accepted", "inspection", "in_progress"];
 
 export default function MechanicBookingsPage() {
   const [bookings, setBookings] = useState<MechanicBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acceptLoading, setAcceptLoading] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-
-      const response = await bookingService.getMechanicIncomingBookings();
-
-      setBookings(response.data || []);
-    } catch (error) {
-      console.error("Failed fetch assigned jobs:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    const loadBookings = async () => {
+    const fetchBookings = async () => {
       try {
-        await fetchBookings();
+        setLoading(true);
+
+        const response = await bookingService.getMechanicIncomingBookings();
+
+        setBookings(response.data || []);
       } catch (error) {
-        console.error("Failed to load assigned jobs:", error);
+        console.error("Failed fetch assigned jobs:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    void loadBookings();
+    fetchBookings();
   }, []);
 
+  const refreshBookings = async () => {
+    const response = await bookingService.getMechanicIncomingBookings();
+
+    setBookings(response.data || []);
+  };
+
   const stats = useMemo(() => {
-    const activeJobs = bookings.filter((booking) =>
-      ["accepted", "inspection", "in_progress"].includes(booking.status),
-    );
+    const pending = bookings.filter((booking) => {
+      return booking.status === "pending";
+    }).length;
 
-    const accepted = activeJobs.filter(
-      (booking) => booking.status === "accepted",
-    ).length;
+    const activeJobs = bookings.filter((booking) => {
+      return ["accepted", "inspection", "in_progress"].includes(booking.status);
+    });
 
-    const inspection = activeJobs.filter(
-      (booking) => booking.status === "inspection",
-    ).length;
+    const accepted = activeJobs.filter((booking) => {
+      return booking.status === "accepted";
+    }).length;
 
-    const inProgress = activeJobs.filter(
-      (booking) => booking.status === "in_progress",
-    ).length;
+    const inspection = activeJobs.filter((booking) => {
+      return booking.status === "inspection";
+    }).length;
+
+    const inProgress = activeJobs.filter((booking) => {
+      return booking.status === "in_progress";
+    }).length;
 
     return {
       total: activeJobs.length,
+      pending,
       accepted,
       inspection,
       inProgress,
@@ -191,9 +196,9 @@ export default function MechanicBookingsPage() {
   }, [bookings]);
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter((booking) => {
-      const keyword = search.toLowerCase();
+    const keyword = search.toLowerCase();
 
+    return bookings.filter((booking) => {
       const matchesSearch =
         (booking.booking_code || "").toLowerCase().includes(keyword) ||
         (booking.customer_name || "").toLowerCase().includes(keyword) ||
@@ -206,26 +211,29 @@ export default function MechanicBookingsPage() {
       const matchesStatus =
         statusFilter === "All" || booking.status === statusFilter;
 
-      const isActiveJob = ["accepted", "inspection", "in_progress"].includes(
-        booking.status,
-      );
+      const shouldShowJob = [
+        "pending",
+        "accepted",
+        "inspection",
+        "in_progress",
+      ].includes(booking.status);
 
-      return matchesSearch && matchesStatus && isActiveJob;
+      return matchesSearch && matchesStatus && shouldShowJob;
     });
   }, [bookings, search, statusFilter]);
 
   const summaryCards = [
     {
+      title: "Pending Requests",
+      value: stats.pending,
+      description: "Waiting to be accepted",
+      icon: Clock,
+    },
+    {
       title: "Active Jobs",
       value: stats.total,
       description: "Jobs currently assigned",
       icon: Wrench,
-    },
-    {
-      title: "Accepted",
-      value: stats.accepted,
-      description: "Waiting for inspection",
-      icon: Clock,
     },
     {
       title: "Inspection",
@@ -261,25 +269,47 @@ export default function MechanicBookingsPage() {
     return statusConfig[status] || statusConfig.pending;
   };
 
+  const handleAcceptBooking = async (id: number) => {
+    const confirmAccept = window.confirm(
+      "Are you sure you want to accept this booking?",
+    );
+
+    if (!confirmAccept) return;
+
+    try {
+      setAcceptLoading(id);
+
+      await bookingService.acceptBooking(id);
+
+      await refreshBookings();
+    } catch (error) {
+      console.error("Failed to accept booking:", error);
+      alert("Failed to accept booking");
+    } finally {
+      setAcceptLoading(null);
+    }
+  };
+
   return (
     <div className="w-full">
       {/* HEADER */}
-      <div className="flex items-start justify-between gap-5 mb-8">
+      <div className="mb-8 flex items-start justify-between gap-5">
         <div>
-          <p className="text-sm text-[#C2692A] font-medium mb-2">
+          <p className="mb-2 text-sm font-medium text-[#C2692A]">
             Mechanic Workspace
           </p>
 
           <h1 className="text-3xl font-bold tracking-tight">Assigned Jobs</h1>
 
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage assigned vehicle service jobs and continue progress updates.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Accept pending customer requests and manage assigned vehicle service
+            jobs.
           </p>
         </div>
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => {
           const Icon = card.icon;
 
@@ -292,24 +322,24 @@ export default function MechanicBookingsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">{card.title}</p>
 
-                  <h2 className="text-3xl font-bold mt-2">
+                  <h2 className="mt-2 text-3xl font-bold">
                     {loading ? "-" : card.value}
                   </h2>
                 </div>
 
-                <div className="w-12 h-12 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
                   <Icon
                     size={22}
                     className={
                       card.title === "In Progress"
-                        ? "text-[#C2692A] animate-spin"
+                        ? "animate-spin text-[#C2692A]"
                         : "text-[#C2692A]"
                     }
                   />
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground mt-4">
+              <p className="mt-4 text-xs text-muted-foreground">
                 {card.description}
               </p>
             </div>
@@ -318,8 +348,8 @@ export default function MechanicBookingsPage() {
       </div>
 
       {/* SEARCH + FILTER */}
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 h-11 w-full xl:max-w-md rounded-xl border border-border bg-card px-4">
+      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex h-11 w-full items-center gap-3 rounded-xl border border-border bg-card px-4 xl:max-w-md">
           <Search size={15} className="text-muted-foreground" />
 
           <input
@@ -327,16 +357,17 @@ export default function MechanicBookingsPage() {
             placeholder="Search booking, customer, vehicle..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-transparent outline-none border-none flex-1 text-sm"
+            className="flex-1 border-none bg-transparent text-sm outline-none"
           />
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           {filters.map((filter) => (
             <button
               key={filter}
+              type="button"
               onClick={() => setStatusFilter(filter)}
-              className={`px-4 h-9 rounded-lg border text-xs font-medium transition-all capitalize ${
+              className={`h-9 rounded-lg border px-4 text-xs font-medium capitalize transition-all ${
                 statusFilter === filter
                   ? "border-[#522C14] bg-[#522C1415] text-[#C2692A]"
                   : "border-border text-muted-foreground hover:bg-accent"
@@ -350,29 +381,29 @@ export default function MechanicBookingsPage() {
 
       {/* LOADING */}
       {loading && (
-        <div className="h-72 rounded-3xl border border-border bg-card flex items-center justify-center">
+        <div className="flex h-72 items-center justify-center rounded-3xl border border-border bg-card">
           <Loader2 className="animate-spin text-[#C2692A]" />
         </div>
       )}
 
       {/* EMPTY */}
       {!loading && filteredBookings.length === 0 && (
-        <div className="h-72 rounded-3xl border border-border bg-card flex flex-col items-center justify-center text-center px-5">
-          <div className="w-16 h-16 rounded-2xl bg-[#522C1415] border border-[#522C1430] flex items-center justify-center mb-4">
+        <div className="flex h-72 flex-col items-center justify-center rounded-3xl border border-border bg-card px-5 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#522C1430] bg-[#522C1415]">
             <Wrench size={28} className="text-[#C2692A]" />
           </div>
 
-          <h2 className="font-semibold">No assigned jobs found</h2>
+          <h2 className="font-semibold">No jobs found</h2>
 
-          <p className="text-sm text-muted-foreground mt-1">
-            Jobs assigned to you will appear here.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pending requests and assigned jobs will appear here.
           </p>
         </div>
       )}
 
       {/* JOB CARDS */}
       {!loading && filteredBookings.length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           {filteredBookings.map((booking) => {
             const status = getStatus(booking.status);
             const StatusIcon = status.icon;
@@ -380,21 +411,22 @@ export default function MechanicBookingsPage() {
             const priority =
               priorityConfig[booking.priority] || priorityConfig.medium;
 
+            const isPending = booking.status === "pending";
+
             return (
               <div
                 key={booking.id}
                 className="rounded-3xl border border-border bg-card p-6 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/10"
               >
-                {/* TOP */}
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-bold">
                         {booking.booking_code}
                       </h2>
 
                       <div
-                        className="inline-flex items-center gap-2 px-3 py-1 rounded-lg border"
+                        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1"
                         style={{
                           background: status.bg,
                           borderColor: status.border,
@@ -421,33 +453,33 @@ export default function MechanicBookingsPage() {
                       </div>
                     </div>
 
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       Created at {formatDate(booking.created_at)}
                     </p>
                   </div>
 
                   <Link
                     href={`/mechanics/bookings/${booking.id}`}
-                    className="w-10 h-10 rounded-xl border border-border hover:bg-accent transition flex items-center justify-center shrink-0"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border transition hover:bg-accent"
                   >
                     <Eye size={16} />
                   </Link>
                 </div>
 
                 {/* INFO */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="rounded-2xl border border-border bg-background p-4">
                     <p className="text-xs text-muted-foreground">Customer</p>
 
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <UserRound size={15} className="text-[#C2692A]" />
 
-                      <p className="text-sm font-semibold truncate">
+                      <p className="truncate text-sm font-semibold">
                         {booking.customer_name || "-"}
                       </p>
                     </div>
 
-                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
                       {booking.customer_email || "-"}
                     </p>
                   </div>
@@ -455,15 +487,15 @@ export default function MechanicBookingsPage() {
                   <div className="rounded-2xl border border-border bg-background p-4">
                     <p className="text-xs text-muted-foreground">Vehicle</p>
 
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <Car size={15} className="text-[#C2692A]" />
 
-                      <p className="text-sm font-semibold truncate">
+                      <p className="truncate text-sm font-semibold">
                         {booking.brand} {booking.model}
                       </p>
                     </div>
 
-                    <p className="text-xs text-muted-foreground mt-1 uppercase">
+                    <p className="mt-1 text-xs uppercase text-muted-foreground">
                       {booking.license_plate || "-"}
                     </p>
                   </div>
@@ -471,10 +503,10 @@ export default function MechanicBookingsPage() {
                   <div className="rounded-2xl border border-border bg-background p-4">
                     <p className="text-xs text-muted-foreground">Service</p>
 
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <Wrench size={15} className="text-[#C2692A]" />
 
-                      <p className="text-sm font-semibold truncate">
+                      <p className="truncate text-sm font-semibold">
                         {booking.service_name}
                       </p>
                     </div>
@@ -483,10 +515,10 @@ export default function MechanicBookingsPage() {
                   <div className="rounded-2xl border border-border bg-background p-4">
                     <p className="text-xs text-muted-foreground">Schedule</p>
 
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <CalendarDays size={15} className="text-[#C2692A]" />
 
-                      <p className="text-sm font-semibold truncate">
+                      <p className="truncate text-sm font-semibold">
                         {formatDate(booking.preferred_date)} at{" "}
                         {formatTime(booking.preferred_time)}
                       </p>
@@ -495,9 +527,9 @@ export default function MechanicBookingsPage() {
                 </div>
 
                 {/* BOTTOM */}
-                <div className="flex items-center justify-between gap-3 mt-5">
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div
-                    className="inline-flex items-center px-3 py-1.5 rounded-lg border text-xs font-semibold"
+                    className="inline-flex w-fit items-center rounded-lg border px-3 py-1.5 text-xs font-semibold"
                     style={{
                       background: priority.bg,
                       borderColor: priority.border,
@@ -507,13 +539,38 @@ export default function MechanicBookingsPage() {
                     {priority.label} Priority
                   </div>
 
-                  <Link
-                    href={`/mechanics/bookings/${booking.id}`}
-                    className="h-10 px-4 rounded-xl bg-[#522C14] hover:bg-[#6B3818] text-white text-sm font-medium flex items-center gap-2 transition"
-                  >
-                    Open Job
-                    <Eye size={15} />
-                  </Link>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {isPending && (
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptBooking(booking.id)}
+                        disabled={acceptLoading === booking.id}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 text-sm font-medium text-green-400 transition hover:bg-green-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {acceptLoading === booking.id ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            Accepting...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={15} />
+                            Accept Booking
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {!isPending && (
+                      <Link
+                        href={`/mechanics/bookings/${booking.id}`}
+                        className="flex h-10 items-center gap-2 rounded-xl bg-[#522C14] px-4 text-sm font-medium text-white transition hover:bg-[#6B3818]"
+                      >
+                        Open Job
+                        <Eye size={15} />
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             );

@@ -7,40 +7,46 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
-  Banknote,
-  Clock3,
-  FileText,
+  Eye,
+  EyeOff,
   Loader2,
+  Mail,
   RefreshCcw,
   Save,
-  Wrench,
+  ShieldCheck,
+  User,
+  Users,
 } from "lucide-react";
 
-import { serviceService } from "@/services/service.service";
+import {
+  adminUserService,
+  type AdminUserPayload,
+} from "@/services/admin-user.service";
 
-export default function EditServicePage() {
+export default function EditCustomerPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
 
-  const serviceId = params?.id;
+  const userId = params?.id;
 
   const [pageLoading, setPageLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [pageError, setPageError] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
-    description: "",
-    estimated_duration: "",
-    price: "",
+    email: "",
+    password: "",
   });
 
   useEffect(() => {
     let mounted = true;
 
-    const fetchServiceDetail = async () => {
-      if (!serviceId) {
-        setPageError("Service ID tidak ditemukan dari URL.");
+    const fetchCustomerDetail = async () => {
+      if (!userId) {
+        setPageError("Customer ID tidak ditemukan dari URL.");
         setPageLoading(false);
         return;
       }
@@ -51,41 +57,45 @@ export default function EditServicePage() {
 
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
-            reject(new Error("Request timeout saat mengambil detail service."));
+            reject(
+              new Error("Request timeout saat mengambil detail customer."),
+            );
           }, 8000);
         });
 
         const response = await Promise.race([
-          serviceService.getServiceById(serviceId),
+          adminUserService.getUserById(userId),
           timeoutPromise,
         ]);
 
         if (!mounted) return;
 
-        const service = response.data;
+        const user = response.data;
 
-        if (!service) {
-          setPageError("Service tidak ditemukan.");
+        if (!user) {
+          setPageError("Customer tidak ditemukan.");
+          setPageLoading(false);
+          return;
+        }
+
+        if (user.role !== "customer") {
+          setPageError("Akun ini bukan customer.");
           setPageLoading(false);
           return;
         }
 
         setForm({
-          name: service.name || "",
-          description: service.description || "",
-          estimated_duration: service.estimated_duration || "",
-          price:
-            service.price !== null && service.price !== undefined
-              ? String(service.price)
-              : "",
+          name: user.name || "",
+          email: user.email || "",
+          password: "",
         });
       } catch (error) {
-        console.error("Failed to fetch service detail:", error);
+        console.error("Failed to fetch customer detail:", error);
 
         if (!mounted) return;
 
         setPageError(
-          "Gagal mengambil detail service. Cek token login, backend, atau endpoint GET /services/:id.",
+          "Gagal mengambil detail customer. Cek endpoint GET /admin/users/:id di backend.",
         );
       } finally {
         if (mounted) {
@@ -94,16 +104,14 @@ export default function EditServicePage() {
       }
     };
 
-    fetchServiceDetail();
+    fetchCustomerDetail();
 
     return () => {
       mounted = false;
     };
-  }, [serviceId]);
+  }, [userId]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({
@@ -112,54 +120,58 @@ export default function EditServicePage() {
     }));
   };
 
-  const handleUpdateService = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!serviceId) {
-      alert("Service ID not found");
+    if (!userId) {
+      alert("Customer ID not found");
       return;
     }
 
-    if (
-      !form.name.trim() ||
-      !form.description.trim() ||
-      !form.estimated_duration.trim() ||
-      !form.price.trim()
-    ) {
-      alert("Please fill in all fields");
+    if (!form.name.trim() || !form.email.trim()) {
+      alert("Name and email are required");
+      return;
+    }
+
+    if (form.password && form.password.length < 6) {
+      alert("Password must be at least 6 characters");
       return;
     }
 
     try {
       setSubmitLoading(true);
 
-      await serviceService.updateService(serviceId, {
+      const payload: AdminUserPayload = {
         name: form.name.trim(),
-        description: form.description.trim(),
-        estimated_duration: form.estimated_duration.trim(),
-        price: form.price.trim(),
-      });
+        email: form.email.trim().toLowerCase(),
+        role: "customer",
+      };
 
-      router.push("/super_admin/services");
+      if (form.password.trim()) {
+        payload.password = form.password;
+      }
+
+      await adminUserService.updateUser(userId, payload);
+
+      router.push("/super_admin/customers");
       router.refresh();
     } catch (error) {
-      console.error("Failed to update service:", error);
-      alert("Failed to update service");
+      console.error("Failed to update customer:", error);
+      alert("Failed to update customer");
     } finally {
       setSubmitLoading(false);
     }
   };
-
-  const formattedPrice = form.price
-    ? `Rp ${Number(form.price).toLocaleString("id-ID")}`
-    : "-";
 
   if (pageLoading) {
     return (
       <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center rounded-3xl border border-border bg-card/40 backdrop-blur-xl">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Loader2 className="animate-spin" size={24} />
-          <span className="text-sm font-medium">Loading service detail...</span>
+
+          <span className="text-sm font-medium">
+            Loading customer detail...
+          </span>
         </div>
       </div>
     );
@@ -174,7 +186,7 @@ export default function EditServicePage() {
           </div>
 
           <h1 className="text-xl font-bold text-white">
-            Failed to load service
+            Failed to load customer
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
@@ -192,10 +204,10 @@ export default function EditServicePage() {
             </button>
 
             <Link
-              href="/super_admin/services"
+              href="/super_admin/customers"
               className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background/40 px-5 text-sm font-semibold text-muted-foreground transition hover:bg-accent hover:text-white"
             >
-              Back to Services
+              Back to Customers
             </Link>
           </div>
         </div>
@@ -209,26 +221,26 @@ export default function EditServicePage() {
         <div className="relative z-10 flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div>
             <Link
-              href="/super_admin/services"
+              href="/super_admin/customers"
               className="mb-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background/40 px-4 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-white"
             >
               <ArrowLeft size={16} />
-              Back to Services
+              Back to Customers
             </Link>
 
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white shadow-lg shadow-[#522C14]/20">
-              <Wrench size={22} />
+              <Users size={22} />
             </div>
 
-            <p className="mb-2 text-sm text-muted-foreground">Edit Service</p>
+            <p className="mb-2 text-sm text-muted-foreground">Edit Customer</p>
 
             <h1 className="max-w-2xl text-2xl font-bold leading-tight text-white md:text-3xl">
-              Update service information.
+              Update customer account.
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Changes here will update the service catalog shown to customers
-              when they create a booking.
+              Update customer identity, email, or password. Leave password empty
+              if you do not want to change it.
             </p>
           </div>
         </div>
@@ -238,28 +250,27 @@ export default function EditServicePage() {
 
       <section className="grid gap-6 xl:grid-cols-[1.35fr_0.75fr]">
         <form
-          onSubmit={handleUpdateService}
+          onSubmit={handleUpdateCustomer}
           className="rounded-3xl border border-border bg-card/40 p-6 backdrop-blur-xl"
         >
           <div className="mb-6">
             <h2 className="text-xl font-bold text-white">
-              Service Information
+              Customer Information
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Edit the service details carefully because customers will see this
-              information before booking.
+              Edit the account details for this customer.
             </p>
           </div>
 
           <div className="space-y-5">
             <div>
               <label className="mb-2 block text-sm font-semibold text-white">
-                Service Name
+                Full Name
               </label>
 
               <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-background/40 px-4 transition focus-within:border-[#522C14]">
-                <Wrench size={17} className="text-muted-foreground" />
+                <User size={17} className="text-muted-foreground" />
 
                 <input
                   type="text"
@@ -267,7 +278,7 @@ export default function EditServicePage() {
                   value={form.name}
                   onChange={handleChange}
                   disabled={submitLoading}
-                  placeholder="Example: Engine Diagnostic"
+                  placeholder="Example: Randu Agasha"
                   className="w-full bg-transparent text-sm text-white outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
                 />
               </div>
@@ -275,68 +286,66 @@ export default function EditServicePage() {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-white">
-                Description
+                Email Address
               </label>
 
-              <div className="flex gap-3 rounded-xl border border-border bg-background/40 px-4 py-4 transition focus-within:border-[#522C14]">
-                <FileText
-                  size={17}
-                  className="mt-1 shrink-0 text-muted-foreground"
-                />
+              <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-background/40 px-4 transition focus-within:border-[#522C14]">
+                <Mail size={17} className="text-muted-foreground" />
 
-                <textarea
-                  name="description"
-                  value={form.description}
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
                   onChange={handleChange}
                   disabled={submitLoading}
-                  placeholder="Describe what this service includes..."
-                  rows={6}
-                  className="w-full resize-none bg-transparent text-sm leading-6 text-white outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+                  placeholder="customer@revion.com"
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Estimated Duration
-                </label>
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                New Password
+              </label>
 
-                <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-background/40 px-4 transition focus-within:border-[#522C14]">
-                  <Clock3 size={17} className="text-muted-foreground" />
+              <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-background/40 px-4 transition focus-within:border-[#522C14]">
+                <ShieldCheck size={17} className="text-muted-foreground" />
 
-                  <input
-                    type="text"
-                    name="estimated_duration"
-                    value={form.estimated_duration}
-                    onChange={handleChange}
-                    disabled={submitLoading}
-                    placeholder="Example: 2 hours"
-                    className="w-full bg-transparent text-sm text-white outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-                  />
-                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  disabled={submitLoading}
+                  placeholder="Leave empty to keep current password"
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={submitLoading}
+                  className="text-muted-foreground transition hover:text-white disabled:opacity-60"
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Price
-                </label>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Password will only be updated if this field is filled.
+              </p>
+            </div>
 
-                <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-background/40 px-4 transition focus-within:border-[#522C14]">
-                  <Banknote size={17} className="text-muted-foreground" />
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
+              <p className="text-sm font-semibold text-blue-300">
+                Account Role
+              </p>
 
-                  <input
-                    type="number"
-                    name="price"
-                    value={form.price}
-                    onChange={handleChange}
-                    disabled={submitLoading}
-                    placeholder="Example: 250000"
-                    min="0"
-                    className="w-full bg-transparent text-sm text-white outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
+              <p className="mt-1 text-sm leading-6 text-blue-200/70">
+                This account remains as customer and can access customer
+                dashboard features.
+              </p>
             </div>
 
             <div className="flex flex-col gap-3 pt-3 sm:flex-row">
@@ -353,13 +362,13 @@ export default function EditServicePage() {
                 ) : (
                   <>
                     <Save size={17} />
-                    Update Service
+                    Update Customer
                   </>
                 )}
               </button>
 
               <Link
-                href="/super_admin/services"
+                href="/super_admin/customers"
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background/40 px-5 text-sm font-semibold text-muted-foreground transition hover:bg-accent hover:text-white"
               >
                 Cancel
@@ -370,64 +379,39 @@ export default function EditServicePage() {
 
         <aside className="space-y-6">
           <div className="rounded-3xl border border-border bg-card/40 p-6 backdrop-blur-xl">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-white">Live Preview</h2>
+            <h2 className="text-xl font-bold text-white">Live Preview</h2>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Preview of the updated service data.
-              </p>
-            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Account preview based on current data.
+            </p>
 
-            <div className="rounded-2xl border border-border bg-background/40 p-5">
+            <div className="mt-6 rounded-2xl border border-border bg-background/40 p-5">
               <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white shadow-lg shadow-[#522C14]/20">
-                <Wrench size={20} />
+                {form.name ? form.name.charAt(0).toUpperCase() : "C"}
               </div>
 
               <h3 className="text-lg font-bold text-white">
-                {form.name || "Service name"}
+                {form.name || "Customer name"}
               </h3>
 
-              <p className="mt-3 min-h-20 text-sm leading-6 text-muted-foreground">
-                {form.description ||
-                  "Service description will appear here after you type it."}
+              <p className="mt-2 text-sm text-muted-foreground">
+                {form.email || "customer@revion.com"}
               </p>
 
-              <div className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-xl border border-border bg-card/40 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-                    <Banknote size={15} />
-                    <span className="text-xs">Price</span>
-                  </div>
-
-                  <p className="text-sm font-semibold text-white">
-                    {formattedPrice}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-card/40 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-                    <Clock3 size={15} />
-                    <span className="text-xs">Duration</span>
-                  </div>
-
-                  <p className="text-sm font-semibold text-white">
-                    {form.estimated_duration || "-"}
-                  </p>
-                </div>
+              <div className="mt-5 border-t border-border pt-5">
+                <span className="inline-flex rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
+                  Customer
+                </span>
               </div>
             </div>
           </div>
 
           <div className="rounded-3xl border border-border bg-card/40 p-6 backdrop-blur-xl">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#522C14] text-white">
-              <AlertCircle size={22} />
-            </div>
-
             <h2 className="text-xl font-bold text-white">Edit Note</h2>
 
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Make sure the service price and duration stay realistic because
-              customers use this information before submitting a booking.
+              Leave the password field empty if the customer does not request a
+              password reset.
             </p>
           </div>
         </aside>

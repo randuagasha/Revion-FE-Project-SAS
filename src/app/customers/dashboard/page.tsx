@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
   Search,
@@ -34,6 +34,42 @@ import {
 } from "recharts";
 
 import { bookingService } from "@/services/booking.service";
+
+interface LoggedInUser {
+  id?: number;
+  name?: string;
+  email?: string;
+  role?: "customer" | "mechanic" | "super_admin";
+}
+
+const subscribeUser = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  window.addEventListener("user-updated", callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("user-updated", callback);
+  };
+};
+
+const getUserSnapshot = () => {
+  if (typeof window === "undefined") return "";
+
+  return window.localStorage.getItem("user") || "";
+};
+
+const getServerUserSnapshot = () => "";
+
+const parseUser = (rawUser: string): LoggedInUser | null => {
+  if (!rawUser) return null;
+
+  try {
+    return JSON.parse(rawUser) as LoggedInUser;
+  } catch (error) {
+    console.error("Failed to parse user:", error);
+    return null;
+  }
+};
 
 type BookingStatus =
   | "accepted"
@@ -156,6 +192,18 @@ export default function DashboardPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  const rawUser = useSyncExternalStore(
+    subscribeUser,
+    getUserSnapshot,
+    getServerUserSnapshot,
+  );
+
+  const currentUser = useMemo(() => {
+    return parseUser(rawUser);
+  }, [rawUser]);
+
+  const displayName = currentUser?.name || "Customer";
 
   const fetchBookings = async () => {
     try {
@@ -334,7 +382,7 @@ export default function DashboardPage() {
             Customer Dashboard
           </p>
 
-          <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome Back, {displayName}</h1>
 
           <p className="text-muted-foreground text-sm mt-1">
             Track your vehicle services and recent booking activity.
