@@ -1,7 +1,7 @@
 import api from "@/lib/axios";
 
 export type UserRole = "customer" | "mechanic" | "super_admin";
-export type MechanicAvailability = "available" | "busy" | "offline";
+export type MechanicAvailability = "available" | "busy" | "off_duty";
 
 export interface AdminUser {
   id: number;

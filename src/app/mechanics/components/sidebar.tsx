@@ -8,11 +8,13 @@ import {
   ClipboardList,
   CheckCircle,
   Ticket,
-  Settings,
+  UserRound,
   LogOut,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+
+import { logoutUser } from "@/services/auth.service";
 
 const menus = [
   {
@@ -36,9 +38,9 @@ const menus = [
     icon: Ticket,
   },
   {
-    label: "Settings",
-    href: "/mechanics/settings",
-    icon: Settings,
+    label: "Profile",
+    href: "/mechanics/profile",
+    icon: UserRound,
   },
 ];
 
@@ -58,12 +60,18 @@ export default function MechanicSidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout = () => {
-    window.localStorage.removeItem("token");
-    window.localStorage.removeItem("user");
-    window.localStorage.removeItem("role");
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.log("LOGOUT_ERROR:", error);
+    } finally {
+      window.localStorage.removeItem("token");
+      window.localStorage.removeItem("user");
+      window.localStorage.removeItem("role");
 
-    router.push("/auth/login");
+      router.push("/auth/login");
+    }
   };
 
   return (
@@ -73,7 +81,6 @@ export default function MechanicSidebar({
         collapsed ? "w-22" : "w-67.5",
       )}
     >
-      {/* LOGO */}
       <div
         className={cn(
           "h-20 flex items-center border-b border-border transition-all duration-300",
@@ -97,7 +104,6 @@ export default function MechanicSidebar({
         )}
       </div>
 
-      {/* TOGGLE */}
       <button
         type="button"
         onClick={onToggle}
@@ -107,7 +113,6 @@ export default function MechanicSidebar({
         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
 
-      {/* MENUS */}
       <div className="flex-1 p-4 space-y-2">
         {menus.map((menu) => {
           const Icon = menu.icon;
@@ -146,7 +151,6 @@ export default function MechanicSidebar({
         })}
       </div>
 
-      {/* FOOTER */}
       <div className="p-4 border-t border-border">
         <button
           type="button"
