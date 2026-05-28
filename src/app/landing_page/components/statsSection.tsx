@@ -5,14 +5,13 @@ import { motion } from "framer-motion";
 const stats = [
   { value: "200+", label: "Garages Onboarded" },
   { value: "12,000+", label: "Services Completed" },
-  { value: "£4.8M+", label: "Revenue Managed" },
+  { value: "$4.8M+", label: "Revenue Managed" },
   { value: "99.9%", label: "Platform Uptime" },
 ];
 
 export function StatsSection() {
   return (
     <section className="relative py-20 px-6 bg-[#0A0A0A]">
-      {/* Divider */}
       <div className="max-w-7xl mx-auto border-t border-white/10" />
 
       <div className="max-w-7xl mx-auto pt-20">
@@ -31,8 +30,6 @@ export function StatsSection() {
               </div>
 
               <div className="text-sm text-zinc-400">{stat.label}</div>
-
-              {/* Accent line */}
               <div className="w-8 h-0.5 rounded-full mt-1 bg-[#522C14]" />
             </motion.div>
           ))}

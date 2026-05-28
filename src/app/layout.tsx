@@ -33,7 +33,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistem Pengaduan Masyarakat",
+  title: "Revion Cars Management",
   description: "UKK RPL Project",
 };
 

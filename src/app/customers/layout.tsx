@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
+import RevBotFloating from "@/components/revbot/revbot-floating";
+
 import CustomerSidebar from "./components/sidebar";
 import CustomerTopbar from "./components/topbar";
 
@@ -65,6 +67,8 @@ export default function CustomerLayout({
       >
         <div className="w-full px-8 py-8">{children}</div>
       </main>
+
+      <RevBotFloating />
     </div>
   );
 }
